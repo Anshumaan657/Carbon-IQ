@@ -1,0 +1,77 @@
+# Environment variables
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# Secrets and credentials
+*.pem
+*.key
+credentials.json
+service-account.json
+
+# Node and Next.js
+node_modules/
+.next/
+out/
+dist/
+coverage/
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.venv/
+venv/
+
+# IDE and operating system
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# Databases
+*.db
+*.sqlite
+*.sqlite3
+
+# Logs
+logs/
+*.log
+
+# Data generated locally
+data/raw/*
+data/processed/*
+data/documents/*
+
+# Preserve directory structure
+!data/raw/.gitkeep
+!data/processed/.gitkeep
+!data/documents/.gitkeep
+
+# AI and ML artifacts
+models/
+checkpoints/
+embeddings/
+*.pkl
+*.joblib
+*.onnx
+*.pt
+*.pth
+
+# Testing
+playwright-report/
+test-results/
+
+# Temporary files
+tmp/
+temp/
+.cache/
