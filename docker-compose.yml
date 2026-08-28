@@ -4,7 +4,7 @@ services:
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-carboniq}
       POSTGRES_USER: ${POSTGRES_USER:-carboniq}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-carboniq_dev}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-development-password}
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
     volumes:
@@ -17,7 +17,7 @@ services:
       timeout: 5s
       retries: 10
 
-  api:
+  backend:
     build:
       context: ./services/api
     command: >-
@@ -30,7 +30,7 @@ services:
       ENVIRONMENT: development
       DEBUG: "true"
       DATABASE_URL: >-
-        postgresql+psycopg://${POSTGRES_USER:-carboniq}:${POSTGRES_PASSWORD:-carboniq_dev}@database:5432/${POSTGRES_DB:-carboniq}
+        postgresql+psycopg://${POSTGRES_USER:-carboniq}:${POSTGRES_PASSWORD:-development-password}@database:5432/${POSTGRES_DB:-carboniq}
       DATABASE_ECHO: "false"
       DATABASE_CONNECT_TIMEOUT: "5"
     ports:
