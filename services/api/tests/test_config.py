@@ -41,6 +41,11 @@ def test_environment_overrides(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("APP_VERSION", "9.9.9")
     monkeypatch.setenv("ENVIRONMENT", "test")
     monkeypatch.setenv("DEBUG", "true")
+    monkeypatch.setenv(
+        "DATABASE_URL",
+        "postgresql+psycopg://test-user:test-password@test-db:5432/test-db",
+    )
+    monkeypatch.setenv("DATABASE_ECHO", "true")
     monkeypatch.setenv("DATABASE_CONNECT_TIMEOUT", "10")
 
     settings = Settings(_env_file=None)
@@ -49,7 +54,24 @@ def test_environment_overrides(monkeypatch: pytest.MonkeyPatch) -> None:
     assert settings.app_version == "9.9.9"
     assert settings.environment == "test"
     assert settings.debug is True
+    assert settings.database_url.endswith("@test-db:5432/test-db")
+    assert settings.database_echo is True
     assert settings.database_connect_timeout == 10
+
+
+@pytest.mark.parametrize(
+    ("raw_value", "expected"),
+    (("true", True), ("1", True), ("false", False), ("0", False)),
+)
+def test_boolean_parsing(
+    monkeypatch: pytest.MonkeyPatch, raw_value: str, expected: bool
+) -> None:
+    clear_environment(monkeypatch)
+    monkeypatch.setenv("DEBUG", raw_value)
+
+    settings = Settings(_env_file=None)
+
+    assert settings.debug is expected
 
 
 def test_invalid_environment_is_rejected(monkeypatch: pytest.MonkeyPatch) -> None:

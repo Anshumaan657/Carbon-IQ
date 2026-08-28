@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     environment: Literal["development", "test", "production"] = "development"
     debug: bool = False
     database_url: str = (
-        "postgresql+psycopg://carboniq:carboniq_dev@localhost:5432/carboniq"
+        "postgresql+psycopg://carboniq:development-password@localhost:5432/carboniq"
     )
     database_echo: bool = False
     database_connect_timeout: int = Field(default=5, ge=1, le=30)
