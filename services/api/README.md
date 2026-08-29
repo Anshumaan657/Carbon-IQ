@@ -2,8 +2,9 @@
 
 ## Local development with Docker
 
-From the repository root, copy `.env.example` to `.env`, then start PostgreSQL
-and FastAPI:
+From the repository root, copy `.env.example` to `.env`, generate a unique local
+password, and set both `POSTGRES_PASSWORD` and `DATABASE_URL` in `.env`. Never
+commit that file. Then start PostgreSQL and FastAPI:
 
 ```bash
 cp .env.example .env
@@ -25,7 +26,8 @@ intentionally want to remove the local PostgreSQL data volume.
 ## Local development without Docker
 
 With PostgreSQL already running, create `services/api/.env` from its example,
-activate the virtual environment, and run:
+set `DATABASE_URL` to the local connection URL, activate the virtual
+environment, and run:
 
 ```bash
 alembic upgrade head
