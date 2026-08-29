@@ -11,9 +11,7 @@ class Settings(BaseSettings):
     api_v1_prefix: str = "/api/v1"
     environment: Literal["development", "test", "production"] = "development"
     debug: bool = False
-    database_url: str = (
-        "postgresql+psycopg://carboniq:development-password@localhost:5432/carboniq"
-    )
+    database_url: str = Field(min_length=1)
     database_echo: bool = False
     database_connect_timeout: int = Field(default=5, ge=1, le=30)
 

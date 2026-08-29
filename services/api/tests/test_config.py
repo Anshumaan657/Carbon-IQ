@@ -4,6 +4,9 @@ from pydantic import ValidationError
 from app.core.config import Settings, get_settings
 
 
+TEST_DATABASE_URL = "postgresql+psycopg://test-user@test-db:5432/test-db"
+
+
 ENVIRONMENT_KEYS = (
     "APP_NAME",
     "APP_VERSION",
@@ -24,7 +27,7 @@ def clear_environment(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_default_settings(monkeypatch: pytest.MonkeyPatch) -> None:
     clear_environment(monkeypatch)
 
-    settings = Settings(_env_file=None)
+    settings = Settings(database_url=TEST_DATABASE_URL, _env_file=None)
 
     assert settings.app_name == "CarbonIQ API"
     assert settings.app_version == "0.1.0"
@@ -35,6 +38,13 @@ def test_default_settings(monkeypatch: pytest.MonkeyPatch) -> None:
     assert settings.database_connect_timeout == 5
 
 
+def test_database_url_is_required(monkeypatch: pytest.MonkeyPatch) -> None:
+    clear_environment(monkeypatch)
+
+    with pytest.raises(ValidationError):
+        Settings(_env_file=None)
+
+
 def test_environment_overrides(monkeypatch: pytest.MonkeyPatch) -> None:
     clear_environment(monkeypatch)
     monkeypatch.setenv("APP_NAME", "CarbonIQ Test API")
@@ -43,7 +53,7 @@ def test_environment_overrides(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("DEBUG", "true")
     monkeypatch.setenv(
         "DATABASE_URL",
-        "postgresql+psycopg://test-user:test-password@test-db:5432/test-db",
+        TEST_DATABASE_URL,
     )
     monkeypatch.setenv("DATABASE_ECHO", "true")
     monkeypatch.setenv("DATABASE_CONNECT_TIMEOUT", "10")
@@ -54,7 +64,7 @@ def test_environment_overrides(monkeypatch: pytest.MonkeyPatch) -> None:
     assert settings.app_version == "9.9.9"
     assert settings.environment == "test"
     assert settings.debug is True
-    assert settings.database_url.endswith("@test-db:5432/test-db")
+    assert settings.database_url == TEST_DATABASE_URL
     assert settings.database_echo is True
     assert settings.database_connect_timeout == 10
 
@@ -69,7 +79,7 @@ def test_boolean_parsing(
     clear_environment(monkeypatch)
     monkeypatch.setenv("DEBUG", raw_value)
 
-    settings = Settings(_env_file=None)
+    settings = Settings(database_url=TEST_DATABASE_URL, _env_file=None)
 
     assert settings.debug is expected
 
@@ -79,13 +89,14 @@ def test_invalid_environment_is_rejected(monkeypatch: pytest.MonkeyPatch) -> Non
     monkeypatch.setenv("ENVIRONMENT", "invalid")
 
     with pytest.raises(ValidationError):
-        Settings(_env_file=None)
+        Settings(database_url=TEST_DATABASE_URL, _env_file=None)
 
 
 def test_settings_cache(monkeypatch: pytest.MonkeyPatch) -> None:
     clear_environment(monkeypatch)
     get_settings.cache_clear()
     monkeypatch.setenv("APP_NAME", "Cached API")
+    monkeypatch.setenv("DATABASE_URL", TEST_DATABASE_URL)
 
     first = get_settings()
     monkeypatch.setenv("APP_NAME", "Changed API")
