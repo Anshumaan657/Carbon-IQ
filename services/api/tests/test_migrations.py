@@ -12,6 +12,22 @@ from app.core.config import get_settings
 
 
 API_DIRECTORY = Path(__file__).resolve().parents[1]
+HEAD_REVISION = "5fba87ef8d99"
+DOMAIN_TABLES = {
+    "buyer_preferences",
+    "carbon_credits",
+    "document_chunks",
+    "portfolio_items",
+    "portfolios",
+    "project_documents",
+    "project_scores",
+    "projects",
+    "recommendation_items",
+    "recommendation_runs",
+    "risk_signals",
+    "simulated_orders",
+    "users",
+}
 
 
 def test_alembic_upgrade_against_clean_database() -> None:
@@ -22,7 +38,7 @@ def test_alembic_upgrade_against_clean_database() -> None:
         hide_password=False
     )
     test_url = application_url.update_query_dict(
-        {"options": f"-csearch_path={schema_name}"}
+        {"options": f"-csearch_path={schema_name},public"}
     ).render_as_string(
         hide_password=False,
     )
@@ -35,6 +51,7 @@ def test_alembic_upgrade_against_clean_database() -> None:
     try:
         environment = os.environ.copy()
         environment["DATABASE_URL"] = test_url
+        environment["ALEMBIC_VERSION_SCHEMA"] = schema_name
         subprocess.run(
             [sys.executable, "-m", "alembic", "upgrade", "head"],
             cwd=API_DIRECTORY,
@@ -50,8 +67,42 @@ def test_alembic_upgrade_against_clean_database() -> None:
                     sql.Identifier(schema_name)
                 )
             ).fetchone()
+            tables = {
+                row[0]
+                for row in connection.execute(
+                    """
+                    SELECT table_name
+                    FROM information_schema.tables
+                    WHERE table_schema = %s
+                    """,
+                    (schema_name,),
+                ).fetchall()
+            }
 
-        assert revision == ("5316ace179ad",)
+        assert revision == (HEAD_REVISION,)
+        assert DOMAIN_TABLES <= tables
+
+        subprocess.run(
+            [sys.executable, "-m", "alembic", "downgrade", "base"],
+            cwd=API_DIRECTORY,
+            env=environment,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+
+        with psycopg.connect(connection_url) as connection:
+            remaining_domain_tables = connection.execute(
+                """
+                SELECT table_name
+                FROM information_schema.tables
+                WHERE table_schema = %s
+                  AND table_name <> 'alembic_version'
+                """,
+                (schema_name,),
+            ).fetchall()
+
+        assert remaining_domain_tables == []
     finally:
         with psycopg.connect(connection_url, autocommit=True) as connection:
             connection.execute(
