@@ -36,6 +36,17 @@ CarbonIQ is an AI-powered carbon-credit intelligence and comparison platform. It
 - `tests` — end-to-end tests
 - `infrastructure` — deployment and container configuration
 
+## Documentation
+
+- [Complete project documentation](docs/PROJECT_DOCUMENTATION.md)
+- [MVP project scope](docs/PROJECT_SCOPE.md)
+- [API specification](docs/api/API_SPECIFICATION.md)
+- [Data model](docs/DATA_MODEL.md)
+- [Scoring methodology](docs/scoring/SCORING_METHODOLOGY.md)
+- [Delivery roadmap](docs/ROADMAP.md)
+
 ## Project Status
 
-Initial project planning and repository setup.
+Product contracts, typed backend configuration, PostgreSQL/Docker infrastructure,
+and the core domain schema are implemented. Catalogue ingestion, frontend,
+scoring, recommendations, optimization, RAG and reporting remain in development.
