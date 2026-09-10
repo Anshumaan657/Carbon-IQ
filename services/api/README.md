@@ -20,6 +20,12 @@ Access tokens expire after 15 minutes by default. Refresh tokens rotate on use,
 are stored only as SHA-256 digests, and are revoked by
 `POST /api/v1/auth/logout`.
 
+The public project catalogue supports search, filters, sorting, pagination,
+details, and two-to-four-project comparisons. Project writes require an
+administrator token. Buyer-preference endpoints require authentication and
+enforce ownership, so users cannot read or change another user's profiles.
+Interactive API documentation is available at `http://127.0.0.1:8000/docs`.
+
 Verify the services:
 
 ```bash
