@@ -107,10 +107,45 @@ Response `200`:
 ```json
 {
   "access_token": "token",
+  "refresh_token": "random-one-time-refresh-token",
   "token_type": "bearer",
-  "expires_in": 3600
+  "expires_in": 900,
+  "refresh_expires_in": 2592000
 }
 ```
+
+Access tokens are short-lived JWTs. Refresh tokens are random opaque values whose
+SHA-256 digests are stored server-side; raw refresh tokens are never persisted.
+
+### `POST /api/v1/auth/refresh`
+
+Authentication: possession of a valid refresh token
+
+Request:
+
+```json
+{
+  "refresh_token": "random-one-time-refresh-token"
+}
+```
+
+Response `200`: a new access and refresh token pair. Refresh tokens rotate on use,
+and replaying an already-used, revoked, or expired token returns `401`.
+
+### `POST /api/v1/auth/logout`
+
+Authentication: required
+
+Request:
+
+```json
+{
+  "refresh_token": "random-one-time-refresh-token"
+}
+```
+
+Response `204`: the supplied refresh token is revoked. Existing access tokens are
+not stored server-side and expire after their short configured lifetime.
 
 ### `GET /api/v1/auth/me`
 

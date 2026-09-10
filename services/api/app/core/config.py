@@ -1,7 +1,7 @@
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import Field
+from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -14,6 +14,10 @@ class Settings(BaseSettings):
     database_url: str = Field(min_length=1)
     database_echo: bool = False
     database_connect_timeout: int = Field(default=5, ge=1, le=30)
+    jwt_secret_key: SecretStr = Field(min_length=32)
+    jwt_algorithm: Literal["HS256"] = "HS256"
+    access_token_expire_minutes: int = Field(default=15, ge=1, le=1440)
+    refresh_token_expire_days: int = Field(default=30, ge=1, le=365)
 
     model_config = SettingsConfigDict(
         env_file=".env",
