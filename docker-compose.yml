@@ -33,6 +33,10 @@ services:
         postgresql+psycopg://${POSTGRES_USER:-carboniq}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@database:5432/${POSTGRES_DB:-carboniq}
       DATABASE_ECHO: "false"
       DATABASE_CONNECT_TIMEOUT: "5"
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:?Set JWT_SECRET_KEY in .env}
+      JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
+      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-15}
+      REFRESH_TOKEN_EXPIRE_DAYS: ${REFRESH_TOKEN_EXPIRE_DAYS:-30}
     ports:
       - "${API_PORT:-8000}:8000"
     volumes:

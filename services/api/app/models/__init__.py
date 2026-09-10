@@ -15,7 +15,7 @@ from app.models.portfolio import Portfolio, PortfolioItem, SimulatedOrder
 from app.models.project import Project
 from app.models.recommendation import RecommendationItem, RecommendationRun
 from app.models.score import ProjectScore, RiskSignal
-from app.models.user import BuyerPreference, User
+from app.models.user import BuyerPreference, RefreshToken, User
 
 __all__ = [
     "BuyerPreference",
@@ -33,6 +33,7 @@ __all__ = [
     "ProjectStatus",
     "RecommendationItem",
     "RecommendationRun",
+    "RefreshToken",
     "RiskSeverity",
     "RiskSignal",
     "RiskTolerance",
