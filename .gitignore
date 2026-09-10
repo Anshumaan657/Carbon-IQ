@@ -58,7 +58,7 @@ data/documents/*
 !data/documents/.gitkeep
 
 # AI and ML artifacts
-models/
+/models/
 checkpoints/
 embeddings/
 *.pkl
