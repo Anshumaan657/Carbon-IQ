@@ -159,6 +159,9 @@ Returns the authenticated user's safe profile. Password hashes are never returne
 
 Authentication: optional for public catalogue; authenticated users may receive saved-state fields.
 
+Only projects with `active` status are exposed through the public catalogue. Draft,
+inactive, completed, and unknown projects remain unavailable through public reads.
+
 Query parameters:
 
 - `q`: name, developer, or description search
@@ -229,6 +232,21 @@ Validation: between two and four unique IDs.
 
 Response `200` contains aligned project attributes and does not fill missing values with inferred data.
 
+### `POST /api/v1/projects`
+
+Authentication: administrator required.
+
+Creates a validated project catalogue record. External IDs and slugs are unique;
+the registry and registry-project-ID pair must also be unique. A supplied price
+requires a three-letter currency code.
+
+### `PATCH /api/v1/projects/{project_id}`
+
+Authentication: administrator required.
+
+Updates only the supplied project fields. Required project fields cannot be set to
+`null`; nullable evidence and market fields may be cleared explicitly.
+
 ## 6. Buyer preferences
 
 ### `POST /api/v1/preferences`
@@ -258,19 +276,22 @@ Response `201`: stored preference with ID and timestamps.
 
 ### `GET /api/v1/preferences`
 
-Returns the authenticated user's preference profiles.
+Authentication: required. Returns only the authenticated user's preference profiles.
 
 ### `GET /api/v1/preferences/{preference_id}`
 
-Returns one owned profile.
+Authentication: required. Returns one owned profile. A foreign or missing profile
+returns the same `404` response to avoid disclosing another user's resources.
 
 ### `PATCH /api/v1/preferences/{preference_id}`
 
-Updates supplied fields only.
+Authentication: required. Updates supplied fields only and validates the complete
+delivery-date range after applying the patch.
 
 ### `DELETE /api/v1/preferences/{preference_id}`
 
-Response `204`. Profiles referenced by runs may be archived instead of physically removed.
+Authentication: required. Response `204`. A profile already referenced by another
+resource returns `409` rather than silently removing historical decision inputs.
 
 ## 7. Scores and risk signals
 
