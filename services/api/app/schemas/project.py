@@ -212,16 +212,20 @@ class ProjectSummary(BaseModel):
     name: str
     developer_name: str
     country_code: str
+    region: str | None
     project_type: str
     category: ProjectCategory
     registry: str
+    methodology: str | None
     vintage_start: int | None
     vintage_end: int | None
     price_per_credit: float | None
     currency: str | None
+    available_quantity: float | None
     verification_status: VerificationStatus
     status: ProjectStatus
     carboniq_score: float | None = None
+    impact_score: float | None = None
     risk_score: float | None = None
     confidence: float | None = None
     data_as_of: date
@@ -231,12 +235,9 @@ class ProjectSummary(BaseModel):
 class ProjectDetail(ProjectSummary):
     slug: str
     description: str
-    region: str | None
     latitude: float | None
     longitude: float | None
     registry_project_id: str | None
-    methodology: str | None
-    available_quantity: float | None
     sdgs: list[int]
     source_url: str
     created_at: datetime

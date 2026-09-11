@@ -168,11 +168,15 @@ Query parameters:
 - `project_type`: repeatable project-type filter
 - `category`: avoidance, reduction, removal, or mixed
 - `country`: repeatable country filter
+- `region`: repeatable region filter
 - `registry`: repeatable registry filter
 - `verification_status`
 - `vintage_from`, `vintage_to`
+- `vintage_year`: projects whose vintage range includes this year
 - `price_min`, `price_max`
 - `risk_max`
+- `impact_min`
+- `available_only`: when true, require a positive available quantity
 - `sdg`: repeatable integer 1-17
 - `sort`: `name`, `price`, `carboniq_score`, `risk_score`, or `updated_at`
 - `order`: `asc` or `desc`
@@ -215,6 +219,16 @@ Response `200`:
 
 Returns complete project data, latest score, active risk signals, inventory summaries, documents, provenance, and data-freshness fields.
 
+### `GET /api/v1/projects/{project_id}/credits`
+
+Returns the project's available credit inventory by vintage, including quantity,
+price, currency, delivery date, and inventory freshness.
+
+### `GET /api/v1/projects/{project_id}/documents`
+
+Returns safe public document metadata, including type, title, source, publication
+date, ingestion status, and page count. Storage keys and processing errors are not exposed.
+
 ### `POST /api/v1/projects/compare`
 
 Request:
@@ -232,7 +246,7 @@ Validation: between two and four unique IDs.
 
 Response `200` contains aligned project attributes and does not fill missing values with inferred data.
 
-### `POST /api/v1/projects`
+### `POST /api/v1/admin/projects`
 
 Authentication: administrator required.
 
@@ -240,7 +254,7 @@ Creates a validated project catalogue record. External IDs and slugs are unique;
 the registry and registry-project-ID pair must also be unique. A supplied price
 requires a three-letter currency code.
 
-### `PATCH /api/v1/projects/{project_id}`
+### `PATCH /api/v1/admin/projects/{project_id}`
 
 Authentication: administrator required.
 

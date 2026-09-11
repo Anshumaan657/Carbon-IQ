@@ -138,6 +138,7 @@ def project_values(suffix: str, **overrides) -> dict:
         "developer_name": "Climate Developer",
         "description": "Restores degraded forest and supports biodiversity.",
         "country_code": "IN",
+        "region": "South Asia",
         "project_type": "reforestation",
         "category": ProjectCategory.REMOVAL,
         "registry": "Test Registry",
@@ -266,7 +267,16 @@ def test_catalogue_search_filters_scores_and_hides_drafts(
 
     response = client.get(
         "/api/v1/projects",
-        params={"q": "forest", "country": "in", "sdg": 15, "risk_max": 20},
+        params={
+            "q": "forest",
+            "country": "in",
+            "region": "South Asia",
+            "sdg": 15,
+            "risk_max": 20,
+            "impact_min": 85,
+            "vintage_year": 2025,
+            "available_only": True,
+        },
     )
 
     assert response.status_code == 200
@@ -310,6 +320,11 @@ def test_project_detail_contains_evidence_inventory_and_active_risk(
     assert body["documents"][0]["page_count"] == 25
     assert body["active_risk_signals"][0]["code"] == "OLD_VINTAGE"
     assert client.get(f"/api/v1/projects/{draft_id}").status_code == 404
+    assert client.get(f"/api/v1/projects/{india_id}/credits").json()[0]["vintage"] == 2025
+    assert (
+        client.get(f"/api/v1/projects/{india_id}/documents").json()[0]["title"]
+        == "Project Design Document"
+    )
 
 
 def test_compare_requires_two_to_four_unique_public_projects(
@@ -347,17 +362,17 @@ def test_only_administrator_can_create_and_update_projects(
     payload = project_payload()
 
     forbidden = client.post(
-        "/api/v1/projects",
+        "/api/v1/admin/projects",
         json=payload,
         headers={"Authorization": f"Bearer {buyer_token}"},
     )
     created = client.post(
-        "/api/v1/projects",
+        "/api/v1/admin/projects",
         json=payload,
         headers={"Authorization": f"Bearer {admin_token}"},
     )
     updated = client.patch(
-        f"/api/v1/projects/{created.json()['id']}",
+        f"/api/v1/admin/projects/{created.json()['id']}",
         json={"name": "Updated Carbon Project", "price_per_credit": 12.5},
         headers={"Authorization": f"Bearer {admin_token}"},
     )
@@ -378,12 +393,21 @@ def test_project_uniqueness_and_cross_field_validation(
     )
     headers = {"Authorization": f"Bearer {admin_token}"}
     payload = project_payload()
-    assert client.post("/api/v1/projects", json=payload, headers=headers).status_code == 201
+    assert (
+        client.post("/api/v1/admin/projects", json=payload, headers=headers).status_code
+        == 201
+    )
 
-    assert client.post("/api/v1/projects", json=payload, headers=headers).status_code == 409
+    assert (
+        client.post("/api/v1/admin/projects", json=payload, headers=headers).status_code
+        == 409
+    )
     invalid = project_payload("invalid")
     invalid["currency"] = None
-    assert client.post("/api/v1/projects", json=invalid, headers=headers).status_code == 422
+    assert (
+        client.post("/api/v1/admin/projects", json=invalid, headers=headers).status_code
+        == 422
+    )
 
 
 def test_preference_crud_normalizes_values(
