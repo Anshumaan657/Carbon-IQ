@@ -9,22 +9,18 @@ from sqlalchemy import Select, and_, func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
-from app.api.dependencies import require_administrator
 from app.database.session import get_db
 from app.models.enums import ProjectCategory, ProjectStatus, VerificationStatus
 from app.models.project import Project
 from app.models.score import ProjectScore
-from app.models.user import User
 from app.schemas.project import (
     CreditResponse,
     DocumentResponse,
     ProjectCompareRequest,
     ProjectCompareResponse,
-    ProjectCreate,
     ProjectDetail,
     ProjectPage,
     ProjectSummary,
-    ProjectUpdate,
     RiskSignalResponse,
     ScoreSummary,
 )
@@ -78,6 +74,7 @@ def summary_from_row(project: Project, score) -> ProjectSummary:
         {
             **{column.name: getattr(project, column.name) for column in Project.__table__.columns},
             "carboniq_score": score.carboniq_score,
+            "impact_score": score.impact_score,
             "risk_score": score.risk_score,
             "confidence": score.confidence,
         }
@@ -180,13 +177,17 @@ def list_projects(
     project_type: Annotated[list[str] | None, Query()] = None,
     category: ProjectCategory | None = None,
     country: Annotated[list[str] | None, Query()] = None,
+    region: Annotated[list[str] | None, Query()] = None,
     registry: Annotated[list[str] | None, Query()] = None,
     verification_status: VerificationStatus | None = None,
     vintage_from: Annotated[int | None, Query(ge=1900, le=2200)] = None,
     vintage_to: Annotated[int | None, Query(ge=1900, le=2200)] = None,
+    vintage_year: Annotated[int | None, Query(ge=1900, le=2200)] = None,
     price_min: Annotated[float | None, Query(ge=0)] = None,
     price_max: Annotated[float | None, Query(ge=0)] = None,
     risk_max: Annotated[float | None, Query(ge=0, le=100)] = None,
+    impact_min: Annotated[float | None, Query(ge=0, le=100)] = None,
+    available_only: bool = False,
     sdg: Annotated[list[int] | None, Query()] = None,
     sort: Annotated[
         str, Query(pattern="^(name|price|carboniq_score|risk_score|updated_at)$")
@@ -222,6 +223,8 @@ def list_projects(
         conditions.append(Project.category == category)
     if country:
         conditions.append(Project.country_code.in_([value.strip().upper() for value in country]))
+    if region:
+        conditions.append(Project.region.in_([value.strip() for value in region]))
     if registry:
         conditions.append(Project.registry.in_([value.strip() for value in registry]))
     if verification_status:
@@ -230,12 +233,20 @@ def list_projects(
         conditions.append(Project.vintage_end >= vintage_from)
     if vintage_to is not None:
         conditions.append(Project.vintage_start <= vintage_to)
+    if vintage_year is not None:
+        conditions.extend(
+            [Project.vintage_start <= vintage_year, Project.vintage_end >= vintage_year]
+        )
     if price_min is not None:
         conditions.append(Project.price_per_credit >= price_min)
     if price_max is not None:
         conditions.append(Project.price_per_credit <= price_max)
     if risk_max is not None:
         conditions.append(latest.c.risk_score <= risk_max)
+    if impact_min is not None:
+        conditions.append(latest.c.impact_score >= impact_min)
+    if available_only:
+        conditions.append(Project.available_quantity > 0)
     for sdg_value in sdg or []:
         conditions.append(Project.sdgs.any(sdg_value))
 
@@ -278,20 +289,6 @@ def compare_projects(
     return ProjectCompareResponse(items=[detail_from_project(project) for project in projects])
 
 
-@router.post("", response_model=ProjectDetail, status_code=status.HTTP_201_CREATED)
-def create_project(
-    payload: ProjectCreate,
-    _administrator: Annotated[User, Depends(require_administrator)],
-    db: Annotated[Session, Depends(get_db)],
-) -> ProjectDetail:
-    values = payload.model_dump()
-    values["source_url"] = str(payload.source_url)
-    project = Project(**values)
-    db.add(project)
-    commit_project(db, project)
-    return detail_from_project(project)
-
-
 @router.get("/{project_id}", response_model=ProjectDetail)
 def read_project(
     project_id: UUID,
@@ -300,23 +297,25 @@ def read_project(
     return detail_from_project(load_public_project(db, project_id))
 
 
-@router.patch("/{project_id}", response_model=ProjectDetail)
-def update_project(
+@router.get("/{project_id}/credits", response_model=list[CreditResponse])
+def list_project_credits(
     project_id: UUID,
-    payload: ProjectUpdate,
-    _administrator: Annotated[User, Depends(require_administrator)],
     db: Annotated[Session, Depends(get_db)],
-) -> ProjectDetail:
-    project = db.get(Project, project_id)
-    if project is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found.")
-    changes = payload.model_dump(exclude_unset=True)
-    if any(changes.get(field) is None for field in PROJECT_REQUIRED_FIELDS & changes.keys()):
-        raise HTTPException(status_code=422, detail="Required project fields cannot be null.")
-    if "source_url" in changes and changes["source_url"] is not None:
-        changes["source_url"] = str(changes["source_url"])
-    for field, value in changes.items():
-        setattr(project, field, value)
-    validate_project_state(project)
-    commit_project(db, project)
-    return detail_from_project(project)
+) -> list[CreditResponse]:
+    project = load_public_project(db, project_id)
+    return [
+        CreditResponse.model_validate(credit)
+        for credit in sorted(project.credits, key=lambda item: (item.vintage, str(item.id)))
+    ]
+
+
+@router.get("/{project_id}/documents", response_model=list[DocumentResponse])
+def list_project_documents(
+    project_id: UUID,
+    db: Annotated[Session, Depends(get_db)],
+) -> list[DocumentResponse]:
+    project = load_public_project(db, project_id)
+    return [
+        DocumentResponse.model_validate(document)
+        for document in sorted(project.documents, key=lambda item: (item.title, str(item.id)))
+    ]
