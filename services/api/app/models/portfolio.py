@@ -1,11 +1,26 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING
 from uuid import UUID, uuid4
 
-from sqlalchemy import Boolean, CheckConstraint, DateTime, Enum, ForeignKey, Integer, Numeric, String, UniqueConstraint, Uuid, func
+from sqlalchemy import (
+    Boolean,
+    CheckConstraint,
+    Date,
+    DateTime,
+    Enum,
+    ForeignKey,
+    Integer,
+    Numeric,
+    String,
+    Text,
+    UniqueConstraint,
+    Uuid,
+    func,
+)
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.base import Base
@@ -176,6 +191,21 @@ class OrderItem(Base):
     unit_price_snapshot: Mapped[Decimal] = mapped_column(Numeric(14, 2))
     line_total_snapshot: Mapped[Decimal] = mapped_column(Numeric(14, 2))
     currency: Mapped[str] = mapped_column(String(3))
+    registry_snapshot: Mapped[str | None] = mapped_column(String(160), nullable=True)
+    methodology_snapshot: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    source_url_snapshot: Mapped[str | None] = mapped_column(Text, nullable=True)
+    data_as_of_snapshot: Mapped[date | None] = mapped_column(Date, nullable=True)
+    carboniq_score_snapshot: Mapped[Decimal | None] = mapped_column(
+        Numeric(5, 2), nullable=True
+    )
+    quality_score_snapshot: Mapped[Decimal | None] = mapped_column(
+        Numeric(5, 2), nullable=True
+    )
+    risk_score_snapshot: Mapped[Decimal | None] = mapped_column(Numeric(5, 2), nullable=True)
+    score_methodology_version_snapshot: Mapped[str | None] = mapped_column(
+        String(40), nullable=True
+    )
+    risk_signals_snapshot: Mapped[list[dict] | None] = mapped_column(JSONB, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )

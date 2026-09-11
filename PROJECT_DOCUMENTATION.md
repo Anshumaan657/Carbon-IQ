@@ -891,7 +891,8 @@ The team integrates at least twice per week. API or data-contract changes requir
 | Recommendation and portfolio optimization | Not started |
 | Document intelligence and RAG | Not started |
 | Simulated checkout and cancellation | Implemented in Phase 8 |
-| Reporting and analytics | Not started |
+| Order evidence reporting | Implemented in Phase 9A |
+| Product analytics | Not started |
 | CI, deployment and final hardening | Not started |
 
 ### 29.2 Remaining delivery order
@@ -902,7 +903,7 @@ The team integrates at least twice per week. API or data-contract changes requir
 3. Implement scoring and deterministic warning rules.
 4. Implement recommendation and portfolio optimization.
 5. Implement document ingestion, retrieval and grounded Q&A.
-6. Implement downloadable reports and safe product analytics.
+6. Implement safe product analytics and connect all completed backend APIs.
 7. Add CI, complete end-to-end tests, deploy and rehearse the final demonstration.
 
 ## 30. MVP acceptance scenario

@@ -2,10 +2,12 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal, ROUND_HALF_UP
-from typing import Annotated
+from typing import Annotated, Literal
 from uuid import UUID, uuid4
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from fastapi.encoders import jsonable_encoder
+from fastapi.responses import JSONResponse
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
@@ -16,16 +18,21 @@ from app.models.credit import CarbonCredit
 from app.models.enums import OrderStatus, PortfolioStatus, ProjectStatus
 from app.models.portfolio import OrderItem, Portfolio, PortfolioItem, SimulatedOrder
 from app.models.project import Project
+from app.models.score import ProjectScore
 from app.models.user import User
 from app.schemas.order import (
     CertificateResponse,
     OrderCreate,
     OrderItemResponse,
+    OrderReportResponse,
     OrderResponse,
     QuoteItemResponse,
     QuoteRequest,
     QuoteResponse,
+    ReportAllocation,
+    ReportRiskSignal,
 )
+from app.services.reports import render_order_report_pdf
 
 
 router = APIRouter(prefix="/orders", tags=["simulated orders"])
@@ -35,6 +42,7 @@ DISCLAIMER_VERSION = "2026-09"
 DISCLAIMER = (
     "Simulation only. No payment, transfer, registry retirement, or legal carbon claim occurs."
 )
+REPORT_VERSION = "1.0"
 
 
 def load_owned_portfolio(db: Session, user_id: UUID, portfolio_id: UUID) -> Portfolio:
@@ -156,6 +164,99 @@ def order_response(order: SimulatedOrder) -> OrderResponse:
     )
 
 
+def latest_project_score(project: Project) -> ProjectScore | None:
+    if not project.scores:
+        return None
+    return max(project.scores, key=lambda score: (score.calculated_at, str(score.id)))
+
+
+def report_response(order: SimulatedOrder, user: User) -> OrderReportResponse:
+    limitations: set[str] = set()
+    allocations: list[ReportAllocation] = []
+    total_credits = Decimal(order.total_credits_snapshot)
+
+    for item in sorted(
+        order.items, key=lambda value: (value.project_name_snapshot, value.vintage)
+    ):
+        if not item.registry_snapshot:
+            limitations.add("Registry information was unavailable when this order was created.")
+        if not item.methodology_snapshot:
+            limitations.add("Methodology information was unavailable when this order was created.")
+        if not item.source_url_snapshot:
+            limitations.add("A source URL was unavailable when this order was created.")
+        if item.carboniq_score_snapshot is None:
+            limitations.add("A CarbonIQ score was unavailable when this order was created.")
+        if item.risk_signals_snapshot is None:
+            limitations.add("Risk signals were not captured for this legacy order.")
+
+        risk_signals = [
+            ReportRiskSignal.model_validate(signal)
+            for signal in (item.risk_signals_snapshot or [])
+        ]
+        allocation_percent = (
+            Decimal(item.quantity) / total_credits * Decimal("100")
+            if total_credits
+            else Decimal("0")
+        )
+        allocations.append(
+            ReportAllocation(
+                credit_id=item.credit_id,
+                project_id=item.project_id,
+                project_name=item.project_name_snapshot,
+                vintage=item.vintage,
+                quantity=float(item.quantity),
+                unit_price_snapshot=float(item.unit_price_snapshot),
+                line_total_snapshot=float(item.line_total_snapshot),
+                allocation_percent=float(allocation_percent),
+                registry=item.registry_snapshot,
+                methodology=item.methodology_snapshot,
+                source_url=item.source_url_snapshot,
+                data_as_of=item.data_as_of_snapshot,
+                carboniq_score=(
+                    float(item.carboniq_score_snapshot)
+                    if item.carboniq_score_snapshot is not None
+                    else None
+                ),
+                quality_score=(
+                    float(item.quality_score_snapshot)
+                    if item.quality_score_snapshot is not None
+                    else None
+                ),
+                risk_score=(
+                    float(item.risk_score_snapshot)
+                    if item.risk_score_snapshot is not None
+                    else None
+                ),
+                score_methodology_version=item.score_methodology_version_snapshot,
+                risk_signals=risk_signals,
+            )
+        )
+
+    certificate = order_response(order).simulated_retirement_certificate
+    return OrderReportResponse(
+        report_version=REPORT_VERSION,
+        generated_at=datetime.now(timezone.utc),
+        order_id=order.id,
+        order_reference=order.reference,
+        order_status=order.status,
+        order_created_at=order.created_at,
+        cancelled_at=order.cancelled_at,
+        buyer_organization=user.organization_name,
+        currency=order.items[0].currency,
+        total_cost_snapshot=float(order.total_cost_snapshot),
+        total_credits=float(total_credits),
+        estimated_carbon_impact_tonnes=float(total_credits),
+        allocations=allocations,
+        simulated_retirement_certificate=certificate,
+        limitations=sorted(limitations)
+        or [
+            "Scores and risk signals are decision-support indicators, not independent "
+            "assurance or investment advice."
+        ],
+        disclaimer=DISCLAIMER,
+    )
+
+
 def update_project_availability(db: Session, project_ids: set[UUID]) -> None:
     db.flush()
     for project_id in project_ids:
@@ -218,9 +319,13 @@ def create_order(
         db.scalars(
             select(Project)
             .where(Project.id.in_(project_ids))
+            .options(
+                selectinload(Project.scores),
+                selectinload(Project.risk_signals),
+            )
             .order_by(Project.id)
             .with_for_update()
-        )
+        ).unique()
     )
     credits = list(
         db.scalars(
@@ -261,6 +366,20 @@ def create_order(
         line_total = (holding.quantity * credit.price_per_credit).quantize(
             CENT, rounding=ROUND_HALF_UP
         )
+        score = latest_project_score(project)
+        risk_snapshot = [
+            {
+                "code": signal.code,
+                "severity": signal.severity.value,
+                "title": signal.title,
+                "message": signal.message,
+                "rule_version": signal.rule_version,
+            }
+            for signal in sorted(
+                (signal for signal in project.risk_signals if signal.resolved_at is None),
+                key=lambda signal: (signal.severity.value, signal.code),
+            )
+        ]
         credit.quantity_available -= holding.quantity
         total_cost += line_total
         total_credits += holding.quantity
@@ -274,6 +393,17 @@ def create_order(
                 unit_price_snapshot=credit.price_per_credit,
                 line_total_snapshot=line_total,
                 currency=credit.currency,
+                registry_snapshot=project.registry,
+                methodology_snapshot=project.methodology,
+                source_url_snapshot=project.source_url,
+                data_as_of_snapshot=project.data_as_of,
+                carboniq_score_snapshot=score.carboniq_score if score else None,
+                quality_score_snapshot=score.quality_score if score else None,
+                risk_score_snapshot=score.risk_score if score else None,
+                score_methodology_version_snapshot=(
+                    score.methodology_version if score else None
+                ),
+                risk_signals_snapshot=risk_snapshot,
             )
         )
 
@@ -309,6 +439,30 @@ def list_orders(
         .order_by(SimulatedOrder.created_at.desc(), SimulatedOrder.id)
     )
     return [order_response(order) for order in orders]
+
+
+@router.get("/{order_id}/report", response_model=None)
+def download_order_report(
+    order_id: UUID,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[Session, Depends(get_db)],
+    report_format: Annotated[Literal["json", "pdf"], Query(alias="format")] = "json",
+) -> Response:
+    """Return an owner-scoped evidence report for a completed simulated order."""
+    report = report_response(load_owned_order(db, current_user.id, order_id), current_user)
+    if report_format == "json":
+        return JSONResponse(content=jsonable_encoder(report))
+
+    filename = f"carboniq-{report.order_reference.lower()}.pdf"
+    return Response(
+        content=render_order_report_pdf(report),
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Cache-Control": "private, no-store",
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
 
 
 @router.get("/{order_id}", response_model=OrderResponse)

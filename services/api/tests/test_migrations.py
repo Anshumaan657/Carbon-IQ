@@ -12,7 +12,7 @@ from app.core.config import get_settings
 
 
 API_DIRECTORY = Path(__file__).resolve().parents[1]
-HEAD_REVISION = "2f96d9dbea31"
+HEAD_REVISION = "9a714f3c2d10"
 DOMAIN_TABLES = {
     "buyer_preferences",
     "carbon_credits",

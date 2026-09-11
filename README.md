@@ -13,6 +13,7 @@ CarbonIQ is an AI-powered carbon-credit intelligence and comparison platform. It
 - Document-based AI assistant
 - Analytics dashboard
 - Simulated purchase and retirement certificate
+- Downloadable JSON and PDF evidence reports
 
 ## Technology Stack
 
@@ -47,6 +48,7 @@ CarbonIQ is an AI-powered carbon-credit intelligence and comparison platform. It
 
 ## Project Status
 
-Product contracts, typed backend configuration, PostgreSQL/Docker infrastructure,
-and the core domain schema are implemented. Catalogue ingestion, frontend,
-scoring, recommendations, optimization, RAG and reporting remain in development.
+Product contracts, backend configuration, PostgreSQL/Docker infrastructure,
+authentication, catalogue, portfolios, simulated orders, and order reporting are
+implemented. Dataset ingestion, frontend, scoring, recommendations, optimization,
+RAG, analytics, and deployment remain in development.
