@@ -21,6 +21,9 @@ ENVIRONMENT_KEYS = (
     "JWT_ALGORITHM",
     "ACCESS_TOKEN_EXPIRE_MINUTES",
     "REFRESH_TOKEN_EXPIRE_DAYS",
+    "CORS_ALLOWED_ORIGINS",
+    "TRUSTED_HOSTS",
+    "MAX_REQUEST_BODY_BYTES",
 )
 
 
@@ -48,6 +51,11 @@ def test_default_settings(monkeypatch: pytest.MonkeyPatch) -> None:
     assert settings.jwt_secret_key.get_secret_value() == TEST_JWT_SECRET
     assert settings.access_token_expire_minutes == 15
     assert settings.refresh_token_expire_days == 30
+    assert [str(origin).rstrip("/") for origin in settings.cors_allowed_origins] == [
+        "http://localhost:3000"
+    ]
+    assert settings.trusted_hosts == ["localhost", "127.0.0.1", "testserver"]
+    assert settings.max_request_body_bytes == 1_048_576
 
 
 def test_database_url_is_required(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -88,6 +96,12 @@ def test_environment_overrides(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("JWT_SECRET_KEY", TEST_JWT_SECRET)
     monkeypatch.setenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30")
     monkeypatch.setenv("REFRESH_TOKEN_EXPIRE_DAYS", "7")
+    monkeypatch.setenv(
+        "CORS_ALLOWED_ORIGINS",
+        "https://app.carboniq.example,https://admin.carboniq.example",
+    )
+    monkeypatch.setenv("TRUSTED_HOSTS", "api.carboniq.example,localhost")
+    monkeypatch.setenv("MAX_REQUEST_BODY_BYTES", "2048")
 
     settings = Settings(_env_file=None)
 
@@ -100,6 +114,12 @@ def test_environment_overrides(monkeypatch: pytest.MonkeyPatch) -> None:
     assert settings.database_connect_timeout == 10
     assert settings.access_token_expire_minutes == 30
     assert settings.refresh_token_expire_days == 7
+    assert [str(origin).rstrip("/") for origin in settings.cors_allowed_origins] == [
+        "https://app.carboniq.example",
+        "https://admin.carboniq.example",
+    ]
+    assert settings.trusted_hosts == ["api.carboniq.example", "localhost"]
+    assert settings.max_request_body_bytes == 2048
 
 
 @pytest.mark.parametrize(
@@ -124,6 +144,28 @@ def test_boolean_parsing(
 def test_invalid_environment_is_rejected(monkeypatch: pytest.MonkeyPatch) -> None:
     clear_environment(monkeypatch)
     monkeypatch.setenv("ENVIRONMENT", "invalid")
+
+    with pytest.raises(ValidationError):
+        Settings(
+            database_url=TEST_DATABASE_URL,
+            jwt_secret_key=TEST_JWT_SECRET,
+            _env_file=None,
+        )
+
+
+@pytest.mark.parametrize(
+    ("key", "value"),
+    (
+        ("CORS_ALLOWED_ORIGINS", "not-a-url"),
+        ("TRUSTED_HOSTS", ""),
+        ("MAX_REQUEST_BODY_BYTES", "512"),
+    ),
+)
+def test_invalid_hardening_configuration_is_rejected(
+    monkeypatch: pytest.MonkeyPatch, key: str, value: str
+) -> None:
+    clear_environment(monkeypatch)
+    monkeypatch.setenv(key, value)
 
     with pytest.raises(ValidationError):
         Settings(

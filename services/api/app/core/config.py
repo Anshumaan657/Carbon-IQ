@@ -1,8 +1,8 @@
 from functools import lru_cache
-from typing import Literal
+from typing import Annotated, Literal
 
-from pydantic import Field, SecretStr
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import AnyHttpUrl, Field, SecretStr, field_validator
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 
 class Settings(BaseSettings):
@@ -18,6 +18,29 @@ class Settings(BaseSettings):
     jwt_algorithm: Literal["HS256"] = "HS256"
     access_token_expire_minutes: int = Field(default=15, ge=1, le=1440)
     refresh_token_expire_days: int = Field(default=30, ge=1, le=365)
+    cors_allowed_origins: Annotated[list[AnyHttpUrl], NoDecode] = [
+        AnyHttpUrl("http://localhost:3000")
+    ]
+    trusted_hosts: Annotated[list[str], NoDecode] = [
+        "localhost",
+        "127.0.0.1",
+        "testserver",
+    ]
+    max_request_body_bytes: int = Field(default=1_048_576, ge=1_024, le=10_485_760)
+
+    @field_validator("cors_allowed_origins", "trusted_hosts", mode="before")
+    @classmethod
+    def parse_comma_separated_list(cls, value: object) -> object:
+        if isinstance(value, str):
+            return [item.strip() for item in value.split(",") if item.strip()]
+        return value
+
+    @field_validator("cors_allowed_origins", "trusted_hosts")
+    @classmethod
+    def require_non_empty_list(cls, value: list[object]) -> list[object]:
+        if not value:
+            raise ValueError("At least one value is required.")
+        return value
 
     model_config = SettingsConfigDict(
         env_file=".env",

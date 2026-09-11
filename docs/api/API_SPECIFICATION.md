@@ -624,6 +624,21 @@ Returns processing state and inserted, updated, skipped, and rejected counts plu
 
 - Enforce ownership checks for preferences, portfolios, orders, and reports.
 - Rate-limit login and assistant endpoints.
+- Restrict browser origins and trusted hosts through environment configuration.
+- Reject request bodies above the configured maximum size.
+- Return `X-Request-ID` on every response for safe operational correlation.
+- Use the standard error envelope below without exposing stack traces or secrets.
+
+```json
+{
+  "error": {
+    "code": "validation_error",
+    "message": "The request could not be validated.",
+    "request_id": "5c153c0e20d44320a321e96dcc6c4d3a",
+    "details": []
+  }
+}
+```
 - Validate file type, size, and content before document processing.
 - Do not include stack traces, credentials, embeddings, or private storage keys in responses.
 - Escape or sanitize imported display content.
