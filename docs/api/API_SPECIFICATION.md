@@ -80,7 +80,7 @@ Request:
 }
 ```
 
-Response `201`:
+Example successful order-creation response (`201`):
 
 ```json
 {
@@ -536,7 +536,15 @@ Response `200`:
 
 ## 11. Simulated orders and reports
 
-### `POST /api/v1/orders/simulate`
+This API simulates procurement only. It does not process payment, transfer a unit,
+perform a registry retirement, or create a legal environmental claim.
+
+### `POST /api/v1/orders/quote`
+
+Authentication: required. Returns a five-minute informational quote from the
+portfolio's holdings and current inventory prices. Quotes do not reserve inventory.
+
+### `POST /api/v1/orders`
 
 Authentication: required
 
@@ -545,9 +553,29 @@ Request:
 ```json
 {
   "portfolio_id": "61323256-2519-4d4e-9492-b2632bb65c9d",
-  "acknowledge_simulation": true
+  "acknowledge_simulation": true,
+  "simulate_retirement": false
 }
 ```
+
+Order creation locks the portfolio, projects, and credit inventory in a stable
+order; validates availability again; snapshots prices and order lines; decrements
+inventory; and commits all changes atomically. Concurrent requests cannot purchase
+the same remaining quantity twice.
+
+### `GET /api/v1/orders`
+
+Returns the authenticated user's simulated order history.
+
+### `GET /api/v1/orders/{order_id}`
+
+Returns one owned order with immutable line-item snapshots and optional simulated
+retirement-certificate metadata.
+
+### `POST /api/v1/orders/{order_id}/cancel`
+
+Marks a simulated order cancelled and atomically restores its inventory. Repeating
+the request is idempotent. The portfolio and historical snapshots remain immutable.
 
 Response `201`:
 
@@ -556,10 +584,15 @@ Response `201`:
   "id": "438a48bb-af3b-44a8-828b-63a68981a6f4",
   "reference": "CIQ-DEMO-2026-00001",
   "status": "simulated",
-  "total_cost": 98500.0,
-  "total_credits": 100.0,
+  "portfolio_id": "61323256-2519-4d4e-9492-b2632bb65c9d",
+  "total_cost_snapshot": 98500.0,
+  "total_credits_snapshot": 100.0,
+  "currency": "INR",
+  "disclaimer_version": "2026-09",
   "created_at": "2026-08-28T08:00:00Z",
-  "disclaimer": "Simulation only - no credits purchased, transferred, or retired."
+  "cancelled_at": null,
+  "items": [],
+  "simulated_retirement_certificate": null
 }
 ```
 

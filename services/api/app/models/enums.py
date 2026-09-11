@@ -59,3 +59,4 @@ class PortfolioStatus(str, Enum):
 
 class OrderStatus(str, Enum):
     SIMULATED = "simulated"
+    CANCELLED = "cancelled"

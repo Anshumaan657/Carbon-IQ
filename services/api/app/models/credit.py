@@ -11,7 +11,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.database.base import Base
 
 if TYPE_CHECKING:
-    from app.models.portfolio import PortfolioItem
+    from app.models.portfolio import OrderItem, PortfolioItem
     from app.models.project import Project
 
 
@@ -38,3 +38,4 @@ class CarbonCredit(Base):
 
     project: Mapped[Project] = relationship(back_populates="credits")
     portfolio_items: Mapped[list[PortfolioItem]] = relationship(back_populates="credit")
+    order_items: Mapped[list[OrderItem]] = relationship(back_populates="credit")

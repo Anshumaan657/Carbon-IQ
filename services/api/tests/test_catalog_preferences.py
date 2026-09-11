@@ -628,3 +628,138 @@ def test_holding_rejects_duplicates_excess_quantity_and_currency_mismatch(
         json={"credit_id": str(credit_ids[1]), "quantity": 1},
         headers=headers,
     ).status_code == 422
+
+
+def add_portfolio_holding(
+    client: TestClient,
+    headers: dict[str, str],
+    portfolio_id: str,
+    credit_id: UUID,
+    quantity: float,
+) -> None:
+    response = client.post(
+        f"/api/v1/portfolios/{portfolio_id}/holdings",
+        json={"credit_id": str(credit_id), "quantity": quantity},
+        headers=headers,
+    )
+    assert response.status_code == 201
+
+
+def test_order_quote_and_creation_use_current_price_snapshots_and_inventory(
+    client: TestClient,
+    catalog_session_factory: sessionmaker[Session],
+) -> None:
+    headers, portfolio_id, credit_ids = portfolio_setup(client, catalog_session_factory)
+    add_portfolio_holding(client, headers, portfolio_id, credit_ids[0], 40)
+    with catalog_session_factory() as session:
+        credit = session.get(CarbonCredit, credit_ids[0])
+        credit.price_per_credit = Decimal("12.00")
+        session.commit()
+
+    quote = client.post(
+        "/api/v1/orders/quote", json={"portfolio_id": portfolio_id}, headers=headers
+    )
+    created = client.post(
+        "/api/v1/orders",
+        json={
+            "portfolio_id": portfolio_id,
+            "acknowledge_simulation": True,
+            "simulate_retirement": True,
+        },
+        headers=headers,
+    )
+
+    assert quote.status_code == 200
+    assert quote.json()["total_cost"] == 480.0
+    assert quote.json()["items"][0]["unit_price"] == 12.0
+    assert created.status_code == 201
+    body = created.json()
+    assert body["status"] == "simulated"
+    assert body["total_cost_snapshot"] == 480.0
+    assert body["items"][0]["unit_price_snapshot"] == 12.0
+    assert body["simulated_retirement_certificate"]["quantity"] == 40.0
+    with catalog_session_factory() as session:
+        assert session.get(CarbonCredit, credit_ids[0]).quantity_available == Decimal("460.000")
+
+
+def test_order_history_is_owner_scoped_and_portfolio_cannot_be_ordered_twice(
+    client: TestClient,
+    catalog_session_factory: sessionmaker[Session],
+) -> None:
+    headers, portfolio_id, credit_ids = portfolio_setup(client, catalog_session_factory)
+    add_portfolio_holding(client, headers, portfolio_id, credit_ids[0], 5)
+    created = client.post(
+        "/api/v1/orders",
+        json={"portfolio_id": portfolio_id, "acknowledge_simulation": True},
+        headers=headers,
+    )
+    order_id = created.json()["id"]
+    _, other_token = create_user(catalog_session_factory, "order-other@example.com")
+    other_headers = {"Authorization": f"Bearer {other_token}"}
+
+    assert client.get("/api/v1/orders", headers=headers).status_code == 200
+    assert len(client.get("/api/v1/orders", headers=headers).json()) == 1
+    assert client.get(f"/api/v1/orders/{order_id}", headers=headers).status_code == 200
+    assert client.get(f"/api/v1/orders/{order_id}", headers=other_headers).status_code == 404
+    assert client.post(
+        "/api/v1/orders",
+        json={"portfolio_id": portfolio_id, "acknowledge_simulation": True},
+        headers=headers,
+    ).status_code == 409
+    assert client.patch(
+        f"/api/v1/portfolios/{portfolio_id}",
+        json={"name": "Cannot change"},
+        headers=headers,
+    ).status_code == 409
+
+
+def test_order_cancellation_restores_inventory_and_is_idempotent(
+    client: TestClient,
+    catalog_session_factory: sessionmaker[Session],
+) -> None:
+    headers, portfolio_id, credit_ids = portfolio_setup(client, catalog_session_factory)
+    add_portfolio_holding(client, headers, portfolio_id, credit_ids[0], 25)
+    created = client.post(
+        "/api/v1/orders",
+        json={"portfolio_id": portfolio_id, "acknowledge_simulation": True},
+        headers=headers,
+    ).json()
+
+    cancelled = client.post(f"/api/v1/orders/{created['id']}/cancel", headers=headers)
+    repeated = client.post(f"/api/v1/orders/{created['id']}/cancel", headers=headers)
+
+    assert cancelled.status_code == 200
+    assert cancelled.json()["status"] == "cancelled"
+    assert cancelled.json()["cancelled_at"] is not None
+    assert repeated.status_code == 200
+    with catalog_session_factory() as session:
+        assert session.get(CarbonCredit, credit_ids[0]).quantity_available == Decimal("500.000")
+
+
+def test_order_validation_rejects_empty_unacknowledged_and_oversold_portfolios(
+    client: TestClient,
+    catalog_session_factory: sessionmaker[Session],
+) -> None:
+    headers, portfolio_id, credit_ids = portfolio_setup(client, catalog_session_factory)
+    assert client.post(
+        "/api/v1/orders/quote", json={"portfolio_id": portfolio_id}, headers=headers
+    ).status_code == 422
+    assert client.post(
+        "/api/v1/orders",
+        json={"portfolio_id": portfolio_id, "acknowledge_simulation": False},
+        headers=headers,
+    ).status_code == 422
+    add_portfolio_holding(client, headers, portfolio_id, credit_ids[0], 500)
+    with catalog_session_factory() as session:
+        session.get(CarbonCredit, credit_ids[0]).quantity_available = Decimal("499.000")
+        session.commit()
+
+    failed = client.post(
+        "/api/v1/orders",
+        json={"portfolio_id": portfolio_id, "acknowledge_simulation": True},
+        headers=headers,
+    )
+
+    assert failed.status_code == 409
+    with catalog_session_factory() as session:
+        assert session.get(CarbonCredit, credit_ids[0]).quantity_available == Decimal("499.000")

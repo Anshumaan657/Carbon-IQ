@@ -28,6 +28,10 @@ enforce ownership, so users cannot read or change another user's profiles.
 Portfolio endpoints provide owner-scoped holdings, immutable price snapshots,
 availability validation, financial and impact totals, score averages, and
 quantity-allocation breakdowns.
+Order endpoints provide non-binding quotes and atomic simulated checkout with
+row-locked inventory, immutable order snapshots, owner-scoped history,
+idempotent cancellation, and optional clearly labelled simulated retirement
+certificates. No real payment or registry retirement occurs.
 Interactive API documentation is available at `http://127.0.0.1:8000/docs`.
 
 Verify the services:

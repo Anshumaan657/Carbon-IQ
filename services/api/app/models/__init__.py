@@ -11,7 +11,7 @@ from app.models.enums import (
     UserRole,
     VerificationStatus,
 )
-from app.models.portfolio import Portfolio, PortfolioItem, SimulatedOrder
+from app.models.portfolio import OrderItem, Portfolio, PortfolioItem, SimulatedOrder
 from app.models.project import Project
 from app.models.recommendation import RecommendationItem, RecommendationRun
 from app.models.score import ProjectScore, RiskSignal
@@ -23,6 +23,7 @@ __all__ = [
     "DocumentChunk",
     "DocumentStatus",
     "OrderStatus",
+    "OrderItem",
     "Portfolio",
     "PortfolioItem",
     "PortfolioStatus",
