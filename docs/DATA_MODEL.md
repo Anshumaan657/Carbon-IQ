@@ -45,7 +45,7 @@
 
 ### OrderStatus
 
-`simulated`
+`simulated`, `cancelled`
 
 ## 3. Entities
 
@@ -269,10 +269,30 @@ Only one current score per `(project_id, methodology_version)` is exposed by def
 | reference | string | Yes | Unique human-readable reference |
 | user_id | UUID | Yes | Foreign key to User |
 | portfolio_id | UUID | Yes | Foreign key to Portfolio |
-| status | OrderStatus | Yes | Always `simulated` in MVP |
+| status | OrderStatus | Yes | `simulated` or `cancelled` |
 | total_cost_snapshot | decimal | Yes | Immutable snapshot |
 | total_credits_snapshot | decimal | Yes | Immutable snapshot |
 | disclaimer_version | string | Yes | Reported disclaimer version |
+| cancelled_at | timestamp | No | Set when simulated inventory is restored |
+| certificate_reference | string | No | Unique simulated certificate reference |
+| certificate_issued_at | timestamp | No | Simulated issue time |
+| retirement_quantity | decimal | No | Explicitly simulated retirement quantity |
+| created_at | timestamp | Yes | UTC |
+
+### OrderItem
+
+| Field | Type | Required | Notes |
+|---|---|---:|---|
+| id | UUID | Yes | Primary key |
+| order_id | UUID | Yes | Foreign key to SimulatedOrder |
+| credit_id | UUID | Yes | Foreign key to CarbonCredit |
+| project_id | UUID | Yes | Foreign key to Project |
+| project_name_snapshot | string | Yes | Immutable checkout snapshot |
+| vintage | integer | Yes | Immutable checkout snapshot |
+| quantity | decimal | Yes | Greater than zero |
+| unit_price_snapshot | decimal | Yes | Current price captured at checkout |
+| line_total_snapshot | decimal | Yes | Quantity multiplied by unit price |
+| currency | string | Yes | Three-letter currency code |
 | created_at | timestamp | Yes | UTC |
 
 ## 4. Relationships
@@ -295,6 +315,9 @@ Project 1---N RecommendationItem
 Portfolio 1---N PortfolioItem
 CarbonCredit 1---N PortfolioItem
 Portfolio 1---0..1 SimulatedOrder
+SimulatedOrder 1---N OrderItem
+CarbonCredit 1---N OrderItem
+Project 1---N OrderItem
 ```
 
 ## 5. Derived values

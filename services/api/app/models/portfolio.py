@@ -5,7 +5,7 @@ from decimal import Decimal
 from typing import TYPE_CHECKING
 from uuid import UUID, uuid4
 
-from sqlalchemy import Boolean, CheckConstraint, DateTime, Enum, ForeignKey, Numeric, String, UniqueConstraint, Uuid, func
+from sqlalchemy import Boolean, CheckConstraint, DateTime, Enum, ForeignKey, Integer, Numeric, String, UniqueConstraint, Uuid, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.base import Base
@@ -101,6 +101,10 @@ class SimulatedOrder(Base):
         UniqueConstraint("portfolio_id", name="uq_simulated_orders_portfolio_id"),
         CheckConstraint("total_cost_snapshot >= 0", name="total_cost_non_negative"),
         CheckConstraint("total_credits_snapshot > 0", name="total_credits_positive"),
+        CheckConstraint(
+            "retirement_quantity IS NULL OR retirement_quantity > 0",
+            name="retirement_quantity_positive",
+        ),
     )
 
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
@@ -123,9 +127,58 @@ class SimulatedOrder(Base):
     total_cost_snapshot: Mapped[Decimal] = mapped_column(Numeric(14, 2))
     total_credits_snapshot: Mapped[Decimal] = mapped_column(Numeric(14, 3))
     disclaimer_version: Mapped[str] = mapped_column(String(40))
+    cancelled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    certificate_reference: Mapped[str | None] = mapped_column(
+        String(100), unique=True, nullable=True
+    )
+    certificate_issued_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    retirement_quantity: Mapped[Decimal | None] = mapped_column(
+        Numeric(14, 3), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
 
     user: Mapped[User] = relationship(back_populates="simulated_orders")
     portfolio: Mapped[Portfolio] = relationship(back_populates="simulated_order")
+    items: Mapped[list[OrderItem]] = relationship(
+        back_populates="order", cascade="all, delete-orphan"
+    )
+
+
+class OrderItem(Base):
+    """Immutable credit, project, quantity, and price snapshot for a simulated order."""
+
+    __tablename__ = "order_items"
+    __table_args__ = (
+        UniqueConstraint("order_id", "credit_id", name="uq_order_items_order_credit"),
+        CheckConstraint("quantity > 0", name="quantity_positive"),
+        CheckConstraint("unit_price_snapshot >= 0", name="unit_price_non_negative"),
+        CheckConstraint("line_total_snapshot >= 0", name="line_total_non_negative"),
+        CheckConstraint("char_length(currency) = 3", name="currency_length"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    order_id: Mapped[UUID] = mapped_column(
+        ForeignKey("simulated_orders.id", ondelete="CASCADE"), index=True
+    )
+    credit_id: Mapped[UUID] = mapped_column(
+        ForeignKey("carbon_credits.id", ondelete="RESTRICT"), index=True
+    )
+    project_id: Mapped[UUID] = mapped_column(
+        ForeignKey("projects.id", ondelete="RESTRICT"), index=True
+    )
+    project_name_snapshot: Mapped[str] = mapped_column(String(240))
+    vintage: Mapped[int] = mapped_column(Integer)
+    quantity: Mapped[Decimal] = mapped_column(Numeric(14, 3))
+    unit_price_snapshot: Mapped[Decimal] = mapped_column(Numeric(14, 2))
+    line_total_snapshot: Mapped[Decimal] = mapped_column(Numeric(14, 2))
+    currency: Mapped[str] = mapped_column(String(3))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+    order: Mapped[SimulatedOrder] = relationship(back_populates="items")
+    credit: Mapped[CarbonCredit] = relationship(back_populates="order_items")

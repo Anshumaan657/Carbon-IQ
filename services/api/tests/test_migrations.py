@@ -12,11 +12,12 @@ from app.core.config import get_settings
 
 
 API_DIRECTORY = Path(__file__).resolve().parents[1]
-HEAD_REVISION = "cebf05c1e22e"
+HEAD_REVISION = "2f96d9dbea31"
 DOMAIN_TABLES = {
     "buyer_preferences",
     "carbon_credits",
     "document_chunks",
+    "order_items",
     "portfolio_items",
     "portfolios",
     "project_documents",

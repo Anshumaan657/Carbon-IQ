@@ -5,6 +5,7 @@ from app.models import (
     BuyerPreference,
     CarbonCredit,
     DocumentChunk,
+    OrderItem,
     Portfolio,
     PortfolioItem,
     Project,
@@ -23,6 +24,7 @@ EXPECTED_TABLES = {
     "buyer_preferences",
     "carbon_credits",
     "document_chunks",
+    "order_items",
     "portfolio_items",
     "portfolios",
     "project_documents",
@@ -56,6 +58,7 @@ def test_primary_keys_and_foreign_keys_are_declared() -> None:
         RefreshToken,
         Portfolio,
         PortfolioItem,
+        OrderItem,
         SimulatedOrder,
     )
 
@@ -67,6 +70,8 @@ def test_primary_keys_and_foreign_keys_are_declared() -> None:
     assert CarbonCredit.__table__.c.project_id.foreign_keys
     assert DocumentChunk.__table__.c.document_id.foreign_keys
     assert PortfolioItem.__table__.c.credit_id.foreign_keys
+    assert OrderItem.__table__.c.order_id.foreign_keys
+    assert OrderItem.__table__.c.credit_id.foreign_keys
     assert RecommendationItem.__table__.c.recommendation_run_id.foreign_keys
 
 

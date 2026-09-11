@@ -398,7 +398,7 @@ The database uses PostgreSQL 16, SQLAlchemy models and Alembic migrations. UUIDs
 | Document intelligence | `ProjectDocument`, `DocumentChunk` |
 | Decision intelligence | `ProjectScore`, `RiskSignal` |
 | Recommendations | `RecommendationRun`, `RecommendationItem` |
-| Portfolio and simulation | `Portfolio`, `PortfolioItem`, `SimulatedOrder` |
+| Portfolio and simulation | `Portfolio`, `PortfolioItem`, `SimulatedOrder`, `OrderItem` |
 
 ### 13.2 Important relationships
 
@@ -420,6 +420,9 @@ Project 1---N RecommendationItem
 Portfolio 1---N PortfolioItem
 CarbonCredit 1---N PortfolioItem
 Portfolio 1---0..1 SimulatedOrder
+SimulatedOrder 1---N OrderItem
+CarbonCredit 1---N OrderItem
+Project 1---N OrderItem
 ```
 
 ### 13.3 PostgreSQL extensions
@@ -878,27 +881,29 @@ The team integrates at least twice per week. API or data-contract changes requir
 | Product/API/data/scoring contracts | Completed and merged |
 | Typed FastAPI configuration and health endpoint | Completed and merged |
 | PostgreSQL, Docker and Alembic foundation | Completed and merged |
-| Core database models and domain migration | Implemented and pushed on `feature/core-database-models`; merge still required at document review time |
-| Catalogue ingestion and APIs | Not started |
+| Core database models and domain migration | Completed and merged |
+| Project and carbon-credit catalogue APIs | Completed and merged |
+| Catalogue ingestion and curated dataset | Not started |
 | Next.js catalogue interface | Not started |
 | Scoring and risk implementation | Not started |
-| Authentication, preferences, recommendation and optimization | Not started |
+| Authentication and buyer preferences | Completed and merged |
+| Manual portfolio management | Completed and merged |
+| Recommendation and portfolio optimization | Not started |
 | Document intelligence and RAG | Not started |
-| Simulation, reporting and analytics | Not started |
+| Simulated checkout and cancellation | Implemented in Phase 8 |
+| Reporting and analytics | Not started |
 | CI, deployment and final hardening | Not started |
 
 ### 29.2 Remaining delivery order
 
-1. Merge the core database model PR.
-2. Build the validated project dataset and importer.
-3. Implement project catalogue/detail APIs and seed data.
-4. Build the Next.js catalogue, detail and comparison interface.
-5. Implement scoring and deterministic warning rules.
-6. Implement authentication and buyer preferences.
-7. Implement recommendation and portfolio optimization.
-8. Implement document ingestion, retrieval and grounded Q&A.
-9. Implement simulated orders and reports.
-10. Add CI, complete end-to-end tests, deploy and rehearse the final demonstration.
+1. Build the validated project dataset and importer.
+2. Build the Next.js catalogue, detail, comparison, authentication, preference,
+   portfolio, and simulated-checkout interfaces against the completed APIs.
+3. Implement scoring and deterministic warning rules.
+4. Implement recommendation and portfolio optimization.
+5. Implement document ingestion, retrieval and grounded Q&A.
+6. Implement downloadable reports and safe product analytics.
+7. Add CI, complete end-to-end tests, deploy and rehearse the final demonstration.
 
 ## 30. MVP acceptance scenario
 
