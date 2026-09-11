@@ -293,6 +293,15 @@ Only one current score per `(project_id, methodology_version)` is exposed by def
 | unit_price_snapshot | decimal | Yes | Current price captured at checkout |
 | line_total_snapshot | decimal | Yes | Quantity multiplied by unit price |
 | currency | string | Yes | Three-letter currency code |
+| registry_snapshot | string | No | Registry captured at checkout |
+| methodology_snapshot | string | No | Methodology captured at checkout |
+| source_url_snapshot | string | No | Evidence source captured at checkout |
+| data_as_of_snapshot | date | No | Source freshness captured at checkout |
+| carboniq_score_snapshot | decimal | No | CarbonIQ score captured at checkout |
+| quality_score_snapshot | decimal | No | Quality score captured at checkout |
+| risk_score_snapshot | decimal | No | Risk score captured at checkout |
+| score_methodology_version_snapshot | string | No | Score method version captured at checkout |
+| risk_signals_snapshot | JSON | No | Active risk warnings captured at checkout |
 | created_at | timestamp | Yes | UTC |
 
 ## 4. Relationships

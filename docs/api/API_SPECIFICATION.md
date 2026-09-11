@@ -600,7 +600,13 @@ Response `201`:
 
 Authentication: required and resource owner
 
-Returns a generated PDF or JSON report containing project allocations, score methodology versions, data timestamps, risk warnings, sources, and the mandatory simulation disclaimer.
+Query parameter: `format=json|pdf` (default: `json`).
+
+Returns an evidence report containing the buyer and order summary, allocation,
+estimated impact, immutable registry/methodology/source/score/risk snapshots,
+missing-data limitations, optional simulated certificate, and the mandatory
+simulation disclaimer. PDF responses use `application/pdf`, an attachment filename,
+and `Cache-Control: private, no-store`.
 
 ## 12. Curator import
 

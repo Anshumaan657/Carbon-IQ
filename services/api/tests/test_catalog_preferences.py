@@ -32,6 +32,7 @@ from app.models.enums import (
     VerificationStatus,
 )
 from app.models.project import Project
+from app.models.portfolio import OrderItem
 from app.models.score import ProjectScore, RiskSignal
 from app.models.user import User
 
@@ -680,6 +681,34 @@ def test_order_quote_and_creation_use_current_price_snapshots_and_inventory(
     assert body["simulated_retirement_certificate"]["quantity"] == 40.0
     with catalog_session_factory() as session:
         assert session.get(CarbonCredit, credit_ids[0]).quantity_available == Decimal("460.000")
+        snapshot = session.scalar(
+            select(OrderItem).where(OrderItem.order_id == UUID(body["id"]))
+        )
+        assert snapshot.registry_snapshot == "Test Registry"
+        assert snapshot.carboniq_score_snapshot == Decimal("82.00")
+        assert snapshot.risk_signals_snapshot[0]["code"] == "OLD_VINTAGE"
+
+    json_report = client.get(
+        f"/api/v1/orders/{body['id']}/report", headers=headers
+    )
+    pdf_report = client.get(
+        f"/api/v1/orders/{body['id']}/report", params={"format": "pdf"}, headers=headers
+    )
+
+    assert json_report.status_code == 200
+    report = json_report.json()
+    assert report["order_reference"] == body["reference"]
+    assert report["buyer_organization"] == "CarbonIQ Test Organization"
+    assert report["estimated_carbon_impact_tonnes"] == 40.0
+    assert report["allocations"][0]["registry"] == "Test Registry"
+    assert report["allocations"][0]["risk_signals"][0]["code"] == "OLD_VINTAGE"
+    assert "Simulation only" in report["disclaimer"]
+    assert pdf_report.status_code == 200
+    assert pdf_report.headers["content-type"] == "application/pdf"
+    assert pdf_report.headers["cache-control"] == "private, no-store"
+    assert "attachment" in pdf_report.headers["content-disposition"]
+    assert pdf_report.content.startswith(b"%PDF")
+    assert len(pdf_report.content) > 2_000
 
 
 def test_order_history_is_owner_scoped_and_portfolio_cannot_be_ordered_twice(
@@ -701,6 +730,18 @@ def test_order_history_is_owner_scoped_and_portfolio_cannot_be_ordered_twice(
     assert len(client.get("/api/v1/orders", headers=headers).json()) == 1
     assert client.get(f"/api/v1/orders/{order_id}", headers=headers).status_code == 200
     assert client.get(f"/api/v1/orders/{order_id}", headers=other_headers).status_code == 404
+    assert (
+        client.get(f"/api/v1/orders/{order_id}/report", headers=other_headers).status_code
+        == 404
+    )
+    assert (
+        client.get(
+            f"/api/v1/orders/{order_id}/report",
+            params={"format": "spreadsheet"},
+            headers=headers,
+        ).status_code
+        == 422
+    )
     assert client.post(
         "/api/v1/orders",
         json={"portfolio_id": portfolio_id, "acknowledge_simulation": True},

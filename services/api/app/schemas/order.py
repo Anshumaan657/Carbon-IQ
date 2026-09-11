@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 from typing import Literal
 from uuid import UUID
 
@@ -73,3 +73,50 @@ class OrderResponse(BaseModel):
     cancelled_at: datetime | None
     items: list[OrderItemResponse]
     simulated_retirement_certificate: CertificateResponse | None
+
+
+class ReportRiskSignal(BaseModel):
+    code: str
+    severity: str
+    title: str
+    message: str
+    rule_version: str
+
+
+class ReportAllocation(BaseModel):
+    credit_id: UUID
+    project_id: UUID
+    project_name: str
+    vintage: int
+    quantity: float
+    unit_price_snapshot: float
+    line_total_snapshot: float
+    allocation_percent: float
+    registry: str | None
+    methodology: str | None
+    source_url: str | None
+    data_as_of: date | None
+    carboniq_score: float | None
+    quality_score: float | None
+    risk_score: float | None
+    score_methodology_version: str | None
+    risk_signals: list[ReportRiskSignal]
+
+
+class OrderReportResponse(BaseModel):
+    report_version: str
+    generated_at: datetime
+    order_id: UUID
+    order_reference: str
+    order_status: OrderStatus
+    order_created_at: datetime
+    cancelled_at: datetime | None
+    buyer_organization: str
+    currency: str
+    total_cost_snapshot: float
+    total_credits: float
+    estimated_carbon_impact_tonnes: float
+    allocations: list[ReportAllocation]
+    simulated_retirement_certificate: CertificateResponse | None
+    limitations: list[str]
+    disclaimer: str
