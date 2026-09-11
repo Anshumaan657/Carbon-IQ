@@ -393,6 +393,43 @@ Response `200`:
 
 ## 9. Portfolios
 
+All portfolio endpoints require authentication and enforce ownership. One carbon
+credit represents one metric tonne of CO2-equivalent, so the estimated impact in
+tonnes equals the portfolio's total credit quantity. Financial totals, quantity
+allocation percentages, and quantity-weighted score averages are calculated by the
+server and cannot be supplied by clients.
+
+### `POST /api/v1/portfolios`
+
+Creates an empty draft portfolio with a name, three-letter currency, and optional
+owned preference-profile ID.
+
+### `GET /api/v1/portfolios`
+
+Returns portfolios owned by the authenticated user with holdings and calculated totals.
+
+### `GET /api/v1/portfolios/{portfolio_id}`
+
+Returns one owned portfolio. Foreign and missing IDs both return `404`.
+
+### `PATCH /api/v1/portfolios/{portfolio_id}`
+
+Updates the portfolio name. Ordered portfolios are immutable.
+
+### `POST /api/v1/portfolios/{portfolio_id}/holdings`
+
+Adds an available credit and quantity. The current inventory price is recorded as
+the holding's price snapshot. Duplicate credits and quantities above current
+availability are rejected.
+
+### `PATCH /api/v1/portfolios/{portfolio_id}/holdings/{holding_id}`
+
+Updates a holding quantity and recalculates every portfolio total and allocation.
+
+### `DELETE /api/v1/portfolios/{portfolio_id}/holdings/{holding_id}`
+
+Removes an unlocked holding and recalculates the portfolio. Response `204`.
+
 ### `POST /api/v1/portfolios/optimize`
 
 Authentication: required

@@ -13,7 +13,7 @@ import psycopg
 import pytest
 from fastapi.testclient import TestClient
 from psycopg import sql
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine, select, text
 from sqlalchemy.engine import make_url
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -191,6 +191,7 @@ def seed_catalog(factory: sessionmaker[Session]) -> tuple[UUID, UUID, UUID]:
                 ProjectScore(
                     project_id=brazil.id,
                     carboniq_score=Decimal("71.00"),
+                    quality_score=Decimal("60.00"),
                     risk_score=Decimal("34.00"),
                     confidence=Decimal("0.700"),
                     methodology_version="v1",
@@ -200,6 +201,14 @@ def seed_catalog(factory: sessionmaker[Session]) -> tuple[UUID, UUID, UUID]:
                     vintage=2025,
                     quantity_available=Decimal("500.000"),
                     price_per_credit=Decimal("11.00"),
+                    currency="USD",
+                    data_as_of=date(2026, 9, 1),
+                ),
+                CarbonCredit(
+                    project_id=brazil.id,
+                    vintage=2025,
+                    quantity_available=Decimal("300.000"),
+                    price_per_credit=Decimal("20.00"),
                     currency="USD",
                     data_as_of=date(2026, 9, 1),
                 ),
@@ -486,3 +495,136 @@ def test_preference_validation_rejects_invalid_input(
     )
 
     assert response.status_code == 422
+
+
+def portfolio_setup(
+    client: TestClient,
+    factory: sessionmaker[Session],
+    email: str = "portfolio@example.com",
+) -> tuple[dict[str, str], str, list[UUID]]:
+    india_id, brazil_id, _ = seed_catalog(factory)
+    _, token = create_user(factory, email)
+    headers = {"Authorization": f"Bearer {token}"}
+    created = client.post(
+        "/api/v1/portfolios",
+        json={"name": "Procurement portfolio", "currency": "usd"},
+        headers=headers,
+    )
+    assert created.status_code == 201
+    with factory() as session:
+        credit_ids = list(
+            session.scalars(
+                select(CarbonCredit.id)
+                .where(CarbonCredit.project_id.in_([india_id, brazil_id]))
+                .order_by(CarbonCredit.price_per_credit)
+            )
+        )
+    return headers, created.json()["id"], credit_ids
+
+
+def test_portfolio_crud_and_owner_scoping(
+    client: TestClient,
+    catalog_session_factory: sessionmaker[Session],
+) -> None:
+    headers, portfolio_id, _ = portfolio_setup(client, catalog_session_factory)
+    _, other_token = create_user(catalog_session_factory, "other@example.com")
+    other_headers = {"Authorization": f"Bearer {other_token}"}
+
+    listed = client.get("/api/v1/portfolios", headers=headers)
+    renamed = client.patch(
+        f"/api/v1/portfolios/{portfolio_id}",
+        json={"name": "Renamed portfolio"},
+        headers=headers,
+    )
+
+    assert listed.status_code == 200 and len(listed.json()) == 1
+    assert renamed.status_code == 200
+    assert renamed.json()["name"] == "Renamed portfolio"
+    assert client.get(f"/api/v1/portfolios/{portfolio_id}", headers=other_headers).status_code == 404
+    assert client.get("/api/v1/portfolios").status_code == 401
+
+
+def test_holdings_recalculate_financial_impact_score_and_allocation_totals(
+    client: TestClient,
+    catalog_session_factory: sessionmaker[Session],
+) -> None:
+    headers, portfolio_id, credit_ids = portfolio_setup(client, catalog_session_factory)
+
+    first = client.post(
+        f"/api/v1/portfolios/{portfolio_id}/holdings",
+        json={"credit_id": str(credit_ids[0]), "quantity": 40},
+        headers=headers,
+    )
+    second = client.post(
+        f"/api/v1/portfolios/{portfolio_id}/holdings",
+        json={"credit_id": str(credit_ids[1]), "quantity": 60},
+        headers=headers,
+    )
+
+    assert first.status_code == 201
+    assert second.status_code == 201
+    body = second.json()
+    assert body["total_credits"] == 100.0
+    assert body["estimated_carbon_impact_tonnes"] == 100.0
+    assert body["total_cost"] == 1640.0
+    assert body["average_quality"] == 68.0
+    assert body["portfolio_risk"] == 27.6
+    assert sorted(item["allocation_percent"] for item in body["holdings"]) == [40.0, 60.0]
+
+
+def test_holding_update_and_delete_recalculate_totals(
+    client: TestClient,
+    catalog_session_factory: sessionmaker[Session],
+) -> None:
+    headers, portfolio_id, credit_ids = portfolio_setup(client, catalog_session_factory)
+    added = client.post(
+        f"/api/v1/portfolios/{portfolio_id}/holdings",
+        json={"credit_id": str(credit_ids[0]), "quantity": 25},
+        headers=headers,
+    ).json()
+    holding_id = added["holdings"][0]["id"]
+
+    updated = client.patch(
+        f"/api/v1/portfolios/{portfolio_id}/holdings/{holding_id}",
+        json={"quantity": 10},
+        headers=headers,
+    )
+    deleted = client.delete(
+        f"/api/v1/portfolios/{portfolio_id}/holdings/{holding_id}", headers=headers
+    )
+    empty = client.get(f"/api/v1/portfolios/{portfolio_id}", headers=headers)
+
+    assert updated.status_code == 200
+    assert updated.json()["total_cost"] == 110.0
+    assert deleted.status_code == 204
+    assert empty.json()["total_cost"] == 0.0
+    assert empty.json()["total_credits"] == 0.0
+    assert empty.json()["average_quality"] is None
+
+
+def test_holding_rejects_duplicates_excess_quantity_and_currency_mismatch(
+    client: TestClient,
+    catalog_session_factory: sessionmaker[Session],
+) -> None:
+    headers, portfolio_id, credit_ids = portfolio_setup(client, catalog_session_factory)
+    endpoint = f"/api/v1/portfolios/{portfolio_id}/holdings"
+    assert client.post(
+        endpoint, json={"credit_id": str(credit_ids[0]), "quantity": 1}, headers=headers
+    ).status_code == 201
+    assert client.post(
+        endpoint, json={"credit_id": str(credit_ids[0]), "quantity": 1}, headers=headers
+    ).status_code == 409
+    assert client.post(
+        endpoint, json={"credit_id": str(credit_ids[1]), "quantity": 1000}, headers=headers
+    ).status_code == 409
+
+    eur_portfolio = client.post(
+        "/api/v1/portfolios",
+        json={"name": "Euro portfolio", "currency": "EUR"},
+        headers=headers,
+    ).json()
+    assert client.post(
+        f"/api/v1/portfolios/{eur_portfolio['id']}/holdings",
+        json={"credit_id": str(credit_ids[1]), "quantity": 1},
+        headers=headers,
+    ).status_code == 422
