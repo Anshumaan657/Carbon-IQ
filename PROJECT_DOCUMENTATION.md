@@ -893,7 +893,8 @@ The team integrates at least twice per week. API or data-contract changes requir
 | Simulated checkout and cancellation | Implemented in Phase 8 |
 | Order evidence reporting | Implemented in Phase 9A |
 | Product analytics | Not started |
-| CI, deployment and final hardening | Not started |
+| Backend hardening and CI foundation | Implemented in Phase 10A |
+| Deployment and final end-to-end validation | Not started |
 
 ### 29.2 Remaining delivery order
 

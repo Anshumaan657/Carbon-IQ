@@ -32,6 +32,14 @@ Order endpoints provide non-binding quotes and atomic simulated checkout with
 row-locked inventory, immutable order snapshots, owner-scoped history,
 idempotent cancellation, and optional clearly labelled simulated retirement
 certificates. No real payment or registry retirement occurs.
+Owned orders can be downloaded as JSON or PDF evidence reports from
+`GET /api/v1/orders/{order_id}/report?format=pdf`.
+
+The API applies configurable CORS and trusted-host allowlists, a bounded request
+body size, correlation IDs, structured request logs, standard error envelopes,
+and defensive response headers. Configure `CORS_ALLOWED_ORIGINS` and
+`TRUSTED_HOSTS` as comma-separated values. Every response returns
+`X-Request-ID`; clients may supply a safe value for cross-service tracing.
 Interactive API documentation is available at `http://127.0.0.1:8000/docs`.
 
 Verify the services:
